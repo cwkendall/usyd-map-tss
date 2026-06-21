@@ -85,35 +85,9 @@ export function buildStyle(palette: Palette, detail: DetailLevel): StyleSpecific
     });
   }
 
-  // Ochre highlight for buildings that contain a facility, using the real OSM
-  // building footprint (from facility-footprints.geojson, filtered at runtime to
-  // the visible buildings). Sites with no footprint (regional/placeholder) fall
-  // back to a circle via the "facility-points" source.
-  layers.push({
-    id: "facility-footprint-fill",
-    type: "fill",
-    source: "facility-footprints",
-    paint: { "fill-color": p.primary, "fill-opacity": 0.45 },
-  });
-  layers.push({
-    id: "facility-footprint-line",
-    type: "line",
-    source: "facility-footprints",
-    paint: { "line-color": p.primary, "line-width": 1.6, "line-opacity": 0.95 },
-  });
-  layers.push({
-    id: "facility-highlight",
-    type: "circle",
-    source: "facility-points",
-    paint: {
-      "circle-color": p.primary,
-      "circle-opacity": 0.3,
-      "circle-radius": ["interpolate", ["exponential", 2], ["zoom"], 12, 3, 15, 13, 17, 34, 19, 90],
-      "circle-stroke-color": p.primary,
-      "circle-stroke-width": 1.5,
-      "circle-stroke-opacity": 0.85,
-    },
-  });
+  // NOTE: the ochre facility highlight (footprint fill/line + circle fallback) is
+  // NOT defined here. It's added imperatively in main.ts after each style load, so
+  // those custom data layers survive basemap restyles without setStyle-diff churn.
 
   // Roads — casing then fill. Major classes always; minor at medium; paths at high.
   const majorClasses = ["motorway", "trunk", "primary", "secondary"];
@@ -221,10 +195,6 @@ export function buildStyle(palette: Palette, detail: DetailLevel): StyleSpecific
     glyphs,
     sources: {
       [SOURCE]: sourceDef() as any,
-      // Real OSM footprints of facility buildings (filtered to visible ones at runtime).
-      "facility-footprints": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
-      // Fallback point highlight for buildings that have no footprint.
-      "facility-points": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
     },
     layers,
   };

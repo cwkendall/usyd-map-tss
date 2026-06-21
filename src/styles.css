@@ -58,6 +58,82 @@ body {
   padding: 12px 14px;
   border-bottom: 1px solid var(--c-panel-border);
 }
+
+/* ---------- Right index panel ---------- */
+#index {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 5;
+  max-height: calc(100vh - 28px);
+  display: flex;
+}
+.panel-index {
+  width: 300px;
+}
+.panel-index.collapsed .panel-body {
+  display: none;
+}
+.idx-cluster {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--c-panel-border);
+}
+.idx-cluster:last-child {
+  border-bottom: none;
+}
+.idx-cluster-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--c-panel-muted);
+  margin-bottom: 6px;
+}
+.idx-cluster-bar {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+.idx-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--c-panel-text);
+}
+.idx-row:hover {
+  background: var(--c-secondary);
+}
+.idx-badge {
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 26px;
+  text-align: center;
+  padding: 2px 6px;
+  border-radius: 20px;
+  flex: 0 0 auto;
+}
+.idx-name {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.2;
+}
+.idx-bldg {
+  font-size: 11px;
+  color: var(--c-panel-muted);
+  flex: 0 0 auto;
+}
 .brand {
   display: flex;
   align-items: center;
@@ -558,6 +634,17 @@ body {
     top: 8px;
   }
   .panel {
+    width: 100%;
+  }
+  /* index becomes a bottom sheet so it doesn't overlap the top-left panel */
+  #index {
+    top: auto;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    max-height: 50vh;
+  }
+  .panel-index {
     width: 100%;
   }
 }

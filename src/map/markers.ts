@@ -7,6 +7,7 @@ import { config } from "../config";
 export interface Facility {
   label: string;
   legendNo: string;
+  subId: string;
   facility: string;
   division: "TSS" | "CRF";
   cluster: string;
@@ -33,8 +34,18 @@ export interface Group {
 }
 
 export type LayoutItem =
-  | { kind: "badge"; g: Group; f: Facility; offset: [number, number] }
+  // Badge carries its own geographic position (lon/lat) so it stays anchored to
+  // the map on zoom. Co-located pins are spread by a small metre offset, not a
+  // pixel offset (pixel offsets slide across the map as you zoom).
+  | { kind: "badge"; f: Facility; lon: number; lat: number }
   | { kind: "hub"; g: Group; vis: Facility[]; expanded: boolean };
+
+// Offset a lon/lat by a number of metres east (dx) and north (dy).
+function offsetMetres(lon: number, lat: number, dx: number, dy: number): [number, number] {
+  const dLat = dy / 111320;
+  const dLon = dx / (111320 * Math.cos((lat * Math.PI) / 180));
+  return [lon + dLon, lat + dLat];
+}
 
 export interface Filter {
   divisions: Set<string>; // "TSS","CRF"
@@ -124,12 +135,14 @@ export class Facilities {
     this.markers = [];
   }
 
-  // Fan children out on a circle via pixel offsets.
+  // Fan children out on a circle around the building, using metre offsets so they
+  // stay locked to the map (and separate further as you zoom in).
   private fan(items: LayoutItem[], g: Group, vis: Facility[]) {
-    const r = 22 + Math.min(vis.length, 8) * 5;
+    const r = 14 + Math.min(vis.length, 8) * 2.5; // metres
     vis.forEach((f, i) => {
       const a = (i / vis.length) * Math.PI * 2 - Math.PI / 2;
-      items.push({ kind: "badge", g, f, offset: [Math.cos(a) * r, Math.sin(a) * r] });
+      const [lon, lat] = offsetMetres(g.lon, g.lat, Math.cos(a) * r, -Math.sin(a) * r);
+      items.push({ kind: "badge", f, lon, lat });
     });
   }
 
@@ -141,7 +154,7 @@ export class Facilities {
       const vis = g.facilities.filter((f) => this.visible(f));
       if (vis.length === 0) continue;
       if (vis.length === 1) {
-        items.push({ kind: "badge", g, f: vis[0], offset: [0, 0] });
+        items.push({ kind: "badge", f: vis[0], lon: g.lon, lat: g.lat });
       } else if (this.mode === "offset") {
         this.fan(items, g, vis); // always fanned out, no hub
       } else if (this.expanded.has(g.key)) {
@@ -157,26 +170,26 @@ export class Facilities {
   render() {
     this.clear();
     for (const it of this.layout()) {
-      if (it.kind === "badge") this.addBadge(it.g, it.f, it.offset);
+      if (it.kind === "badge") this.addBadge(it.f, it.lon, it.lat);
       else this.addHub(it.g, it.vis, it.expanded);
     }
   }
 
-  private addBadge(g: Group, f: Facility, offset: [number, number]) {
+  private addBadge(f: Facility, lon: number, lat: number) {
     const el = document.createElement("div");
     el.className = "marker marker-badge";
     el.textContent = f.label;
     el.style.background = f.fillHex;
     el.style.color = f.fontHex;
     el.title = `${f.label} — ${f.facility}`;
-    el.addEventListener("mouseenter", () => this.showHover(f));
+    el.addEventListener("mouseenter", () => this.showHover(f, lon, lat));
     el.addEventListener("mouseleave", () => this.hoverPopup.remove());
     el.addEventListener("click", (ev) => {
       ev.stopPropagation();
       this.hoverPopup.remove();
-      this.showDetail(f);
+      this.showDetail(f, lon, lat);
     });
-    const m = new maplibregl.Marker({ element: el, offset }).setLngLat([g.lon, g.lat]).addTo(this.map);
+    const m = new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(this.map);
     this.markers.push(m);
   }
 
@@ -198,14 +211,14 @@ export class Facilities {
     this.markers.push(m);
   }
 
-  private showHover(f: Facility) {
+  private showHover(f: Facility, lon = f.lon, lat = f.lat) {
     this.hoverPopup
-      .setLngLat([f.lon, f.lat])
+      .setLngLat([lon, lat])
       .setHTML(`<div class="ph"><b>${esc(f.label)}</b> · ${esc(f.facility)}</div>`)
       .addTo(this.map);
   }
 
-  private showDetail(f: Facility) {
+  private showDetail(f: Facility, lon = f.lon, lat = f.lat) {
     const link = f.linkUrl
       ? `<a href="${esc(f.linkUrl)}" target="_blank" rel="noopener">Visit website ↗</a>`
       : f.linkNote
@@ -214,7 +227,7 @@ export class Facilities {
     const code = f.buildingCode ? ` <span class="code">${esc(f.buildingCode)}</span>` : "";
     const notes = f.notes ? `<div class="pd-notes">${esc(f.notes)}</div>` : "";
     this.detailPopup
-      .setLngLat([f.lon, f.lat])
+      .setLngLat([lon, lat])
       .setHTML(
         `<div class="pd">
           <div class="pd-head"><span class="pd-dot" style="background:${esc(f.fillHex)}"></span>

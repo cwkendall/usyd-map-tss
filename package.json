@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Interactive MapLibre map of USyd TSS & CRF facilities, themeable, data-driven from an Excel workbook.",
+  "engines": { "node": ">=22" },
   "scripts": {
     "predev": "npm run build:data",
     "dev": "vite",

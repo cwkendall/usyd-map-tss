@@ -63,10 +63,8 @@ export async function exportPng(map: maplibregl.Map, facilities: Facilities, opt
   // --- markers -------------------------------------------------------------
   for (const it of facilities.layout()) {
     if (it.kind === "badge") {
-      const p = clone.project([it.g.lon, it.g.lat]);
-      const x = (p.x + it.offset[0]) * s;
-      const y = (p.y + it.offset[1]) * s;
-      drawBadge(ctx, x, y, it.f.label, it.f.fillHex, it.f.fontHex, s);
+      const p = clone.project([it.lon, it.lat]);
+      drawBadge(ctx, p.x * s, p.y * s, it.f.label, it.f.fillHex, it.f.fontHex, s);
     } else {
       const p = clone.project([it.g.lon, it.g.lat]);
       drawHub(ctx, p.x * s, p.y * s, it.expanded ? "×" : String(it.vis.length), it.vis.map((f) => f.fillHex), s);

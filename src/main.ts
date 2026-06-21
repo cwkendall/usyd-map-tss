@@ -8,6 +8,7 @@ import { buildStyle } from "./map/style";
 import { Facilities, type Filter, type OverlapMode } from "./map/markers";
 import { exportPng } from "./map/export";
 import { buildControls, type LegendCluster } from "./ui/controls";
+import { buildIndexPanel } from "./ui/index-panel";
 import { loadTheme, saveTheme, clearSavedTheme, defaultTheme, applyThemeVars, type Theme } from "./theme";
 import "./styles.css";
 
@@ -94,8 +95,46 @@ function updateFacilityHighlight() {
       .map((g) => ({ type: "Feature", geometry: { type: "Point", coordinates: [g.lon, g.lat] }, properties: {} })),
   });
 }
-// Repopulate after a style rebuild (theme/detail) clears the sources.
-map.on("styledata", updateFacilityHighlight);
+
+// Add the ochre highlight sources/layers imperatively so they survive basemap
+// restyles (theme/detail) without setStyle-diff "source not found" churn.
+function ensureFacilityLayers() {
+  const pal = theme.palette;
+  const empty = { type: "FeatureCollection" as const, features: [] };
+  if (!map.getSource("facility-footprints")) map.addSource("facility-footprints", { type: "geojson", data: empty });
+  if (!map.getSource("facility-points")) map.addSource("facility-points", { type: "geojson", data: empty });
+  const before = map.getStyle().layers.find((l) => l.type === "symbol")?.id; // keep under labels
+  if (!map.getLayer("facility-footprint-fill"))
+    map.addLayer({ id: "facility-footprint-fill", type: "fill", source: "facility-footprints", paint: { "fill-color": pal.primary, "fill-opacity": 0.45 } }, before);
+  if (!map.getLayer("facility-footprint-line"))
+    map.addLayer({ id: "facility-footprint-line", type: "line", source: "facility-footprints", paint: { "line-color": pal.primary, "line-width": 1.6, "line-opacity": 0.95 } }, before);
+  if (!map.getLayer("facility-highlight"))
+    map.addLayer(
+      {
+        id: "facility-highlight",
+        type: "circle",
+        source: "facility-points",
+        paint: {
+          "circle-color": pal.primary,
+          "circle-opacity": 0.3,
+          "circle-radius": ["interpolate", ["exponential", 2], ["zoom"], 12, 3, 15, 13, 17, 34, 19, 90],
+          "circle-stroke-color": pal.primary,
+          "circle-stroke-width": 1.5,
+          "circle-stroke-opacity": 0.85,
+        },
+      },
+      before,
+    );
+}
+
+// Re-add layers + repopulate on initial load and after every restyle.
+function onStyleReady() {
+  if (!map.isStyleLoaded()) return;
+  ensureFacilityLayers();
+  updateFacilityHighlight();
+}
+map.on("load", onStyleReady);
+map.on("styledata", onStyleReady);
 
 // Debug handles (dev only) for inspection/automation.
 if (import.meta.env.DEV) {
@@ -174,6 +213,13 @@ async function start() {
       search: (f) => facilities.focus(f),
       locate: () => geolocate.trigger(),
     },
+  });
+
+  buildIndexPanel({
+    mount: document.getElementById("index")!,
+    facilities,
+    legend: legendRaw.clusters,
+    onSelect: (f) => facilities.focus(f),
   });
 }
 
