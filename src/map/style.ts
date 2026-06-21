@@ -85,10 +85,22 @@ export function buildStyle(palette: Palette, detail: DetailLevel): StyleSpecific
     });
   }
 
-  // Ochre highlight under buildings that contain a facility. Rendered as a
-  // building-sized circle at each facility point (the basemap merges building
-  // footprints per tile, so we can't reliably recolour individual ones). The
-  // "facility-points" source is populated at runtime from the visible facilities.
+  // Ochre highlight for buildings that contain a facility, using the real OSM
+  // building footprint (from facility-footprints.geojson, filtered at runtime to
+  // the visible buildings). Sites with no footprint (regional/placeholder) fall
+  // back to a circle via the "facility-points" source.
+  layers.push({
+    id: "facility-footprint-fill",
+    type: "fill",
+    source: "facility-footprints",
+    paint: { "fill-color": p.primary, "fill-opacity": 0.45 },
+  });
+  layers.push({
+    id: "facility-footprint-line",
+    type: "line",
+    source: "facility-footprints",
+    paint: { "line-color": p.primary, "line-width": 1.6, "line-opacity": 0.95 },
+  });
   layers.push({
     id: "facility-highlight",
     type: "circle",
@@ -209,8 +221,9 @@ export function buildStyle(palette: Palette, detail: DetailLevel): StyleSpecific
     glyphs,
     sources: {
       [SOURCE]: sourceDef() as any,
-      // One point per facility-bearing building — populated at runtime; drawn as
-      // an ochre highlight circle under the pins.
+      // Real OSM footprints of facility buildings (filtered to visible ones at runtime).
+      "facility-footprints": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+      // Fallback point highlight for buildings that have no footprint.
       "facility-points": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
     },
     layers,

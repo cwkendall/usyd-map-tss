@@ -16,8 +16,10 @@ Live: https://cwkendall.github.io/usyd-map-tss/ · Repo: https://github.com/cwke
 1. Edit `TSS-CRF-MapData.xlsx` — facilities in **Map Data**, coordinates in **Buildings**.
 2. If you added facilities at a new building/site, run `npm run geocode` (or `/geocode`) to
    geocode the missing coordinates into the **Buildings** sheet, then verify the amber rows.
-3. `npm run build:data` (or `/build-data`) regenerates `public/data/*`.
-4. `npm run dev` to preview, then commit + push → GitHub Actions redeploys (`/deploy`).
+3. If buildings were added/moved, run `npm run footprints` (or `/footprints`) to refresh the
+   OSM building outlines used for the ochre highlight (`facility-footprints.geojson`).
+4. `npm run build:data` (or `/build-data`) regenerates `public/data/*`.
+5. `npm run dev` to preview, then commit + push → GitHub Actions redeploys (`/deploy`).
 
 `npm run geocode` only ever fills MISSING coordinates (idempotent; never overwrites verified
 rows), so it's safe to re-run.

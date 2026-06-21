@@ -9,6 +9,7 @@
     "dev": "vite",
     "build:data": "node scripts/build-data.mjs",
     "geocode": "uv run --with openpyxl python scripts/geocode-buildings.py",
+    "footprints": "node scripts/build-footprints.mjs",
     "build": "npm run build:data && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"

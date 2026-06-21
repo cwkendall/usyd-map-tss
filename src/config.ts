@@ -40,6 +40,7 @@ export const config = {
     tss: `${import.meta.env.BASE_URL}data/facilities.tss.geojson`,
     crf: `${import.meta.env.BASE_URL}data/facilities.crf.geojson`,
     legend: `${import.meta.env.BASE_URL}data/legend.json`,
+    footprints: `${import.meta.env.BASE_URL}data/facility-footprints.geojson`,
   },
 
   attribution:

@@ -107,12 +107,12 @@ export class Facilities {
     this.render();
   }
 
-  // Unique building positions that have at least one visible facility — used to
-  // highlight their footprints on the map.
-  visibleGroups(): { lon: number; lat: number }[] {
+  // Unique buildings (key + position) that have at least one visible facility —
+  // used to highlight their footprints on the map.
+  visibleGroups(): { key: string; lon: number; lat: number }[] {
     return this.groups
       .filter((g) => g.facilities.some((f) => this.visible(f)))
-      .map((g) => ({ lon: g.lon, lat: g.lat }));
+      .map((g) => ({ key: g.key, lon: g.lon, lat: g.lat }));
   }
 
   private visible(f: Facility) {

@@ -65,23 +65,36 @@ function rebuildStyle() {
 // --- data + UI ---------------------------------------------------------------
 const facilities = new Facilities(map);
 
-// Highlight buildings that contain a facility: feed one point per visible
-// facility-bearing building into the "facility-points" source, drawn as an ochre
-// circle under the pins. (The basemap merges building footprints per tile, so we
-// highlight by point rather than recolouring individual footprints.)
+// Real OSM footprints of facility buildings, keyed by building key.
+let footprints: { type: "FeatureCollection"; features: Feature[] } = { type: "FeatureCollection", features: [] };
+let footprintKeys = new Set<string>();
+
+// Highlight buildings that contain a facility. Buildings with a real footprint
+// get their actual outline (ochre); the few without one (regional/placeholder)
+// fall back to a circle. Both update with the active division/capability filter.
 function updateFacilityHighlight() {
-  const src = map.getSource("facility-points") as maplibregl.GeoJSONSource | undefined;
-  if (!src) return;
-  const features: Feature[] = opts.highlight
-    ? facilities.visibleGroups().map((g) => ({
-        type: "Feature",
-        geometry: { type: "Point", coordinates: [g.lon, g.lat] },
-        properties: {},
-      }))
-    : [];
-  src.setData({ type: "FeatureCollection", features });
+  const fpSrc = map.getSource("facility-footprints") as maplibregl.GeoJSONSource | undefined;
+  const ptSrc = map.getSource("facility-points") as maplibregl.GeoJSONSource | undefined;
+  if (!fpSrc || !ptSrc) return;
+  if (!opts.highlight) {
+    fpSrc.setData({ type: "FeatureCollection", features: [] });
+    ptSrc.setData({ type: "FeatureCollection", features: [] });
+    return;
+  }
+  const visible = facilities.visibleGroups();
+  const visibleKeys = new Set(visible.map((g) => g.key));
+  fpSrc.setData({
+    type: "FeatureCollection",
+    features: footprints.features.filter((f) => visibleKeys.has((f.properties as { key: string }).key)),
+  });
+  ptSrc.setData({
+    type: "FeatureCollection",
+    features: visible
+      .filter((g) => !footprintKeys.has(g.key))
+      .map((g) => ({ type: "Feature", geometry: { type: "Point", coordinates: [g.lon, g.lat] }, properties: {} })),
+  });
 }
-// Repopulate after a style rebuild (theme/detail) clears the source.
+// Repopulate after a style rebuild (theme/detail) clears the sources.
 map.on("styledata", updateFacilityHighlight);
 
 // Debug handles (dev only) for inspection/automation.
@@ -94,6 +107,13 @@ async function start() {
   const [legendRaw] = await Promise.all([
     fetch(config.data.legend).then((r) => r.json()) as Promise<{ clusters: LegendCluster[] }>,
     facilities.load(),
+    fetch(config.data.footprints)
+      .then((r) => (r.ok ? r.json() : { type: "FeatureCollection", features: [] }))
+      .then((fc) => {
+        footprints = fc;
+        footprintKeys = new Set(fc.features.map((f: Feature) => (f.properties as { key: string }).key));
+      })
+      .catch(() => {}),
   ]);
   for (const c of facilities.clusters()) filter.clusters.add(c);
 
