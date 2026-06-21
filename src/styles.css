@@ -74,6 +74,10 @@ body {
 .panel-index.collapsed .panel-body {
   display: none;
 }
+/* Float the top-right map controls to the left of the index panel (300px + gaps). */
+.maplibregl-ctrl-top-right {
+  right: 322px;
+}
 .idx-cluster {
   padding: 10px 0;
   border-bottom: 1px solid var(--c-panel-border);
@@ -646,5 +650,9 @@ body {
   }
   .panel-index {
     width: 100%;
+  }
+  /* index is a bottom sheet on mobile, so controls return to the right edge */
+  .maplibregl-ctrl-top-right {
+    right: 0;
   }
 }

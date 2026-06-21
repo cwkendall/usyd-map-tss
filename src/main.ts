@@ -125,6 +125,29 @@ function ensureFacilityLayers() {
       },
       before,
     );
+  // Building-code label centred on each highlighted footprint (dark ochre).
+  if (!map.getLayer("facility-label"))
+    map.addLayer({
+      id: "facility-label",
+      type: "symbol",
+      source: "facility-footprints",
+      minzoom: 14,
+      layout: {
+        "text-field": ["get", "label"],
+        "text-font": ["Noto Sans Bold", "Noto Sans Regular"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 14, 9, 17, 13, 19, 16],
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+        // sit just below the pin (which is centred on the same footprint centroid)
+        "text-anchor": "top",
+        "text-offset": [0, 1.8],
+      },
+      paint: {
+        "text-color": "#5A2A12",
+        "text-halo-color": "rgba(255,255,255,0.9)",
+        "text-halo-width": 1.4,
+      },
+    });
 }
 
 // Re-add layers + repopulate on initial load and after every restyle.
@@ -155,6 +178,14 @@ async function start() {
       .catch(() => {}),
   ]);
   for (const c of facilities.clusters()) filter.clusters.add(c);
+
+  // Centre pins/hubs on the real footprint centroid where we have one.
+  const anchors = new Map<string, [number, number]>(
+    footprints.features
+      .map((f) => [(f.properties as { key: string; centroid?: [number, number] }).key, (f.properties as { centroid?: [number, number] }).centroid])
+      .filter((e): e is [string, [number, number]] => Array.isArray(e[1])),
+  );
+  facilities.setBuildingAnchors(anchors);
 
   facilities.setMode(opts.overlap);
   const renderWhenReady = () => {

@@ -62,7 +62,18 @@ await wb.xlsx.readFile(WB);
 const ws = wb.getWorksheet("Buildings");
 const header = ws.getRow(1).values.map(norm);
 const col = (n) => header.indexOf(n);
-const cKey = col("Key"), cLat = col("Latitude"), cLon = col("Longitude"), cName = col("Building Name");
+const cKey = col("Key"), cLat = col("Latitude"), cLon = col("Longitude"), cName = col("Building Name"), cCode = col("Building Code");
+
+// Average of the ring vertices (robust centroid for a building footprint).
+function centroidOf(ring) {
+  const pts = ring.slice(0, -1); // drop closing duplicate
+  let x = 0, y = 0;
+  for (const [lon, lat] of pts) {
+    x += lon;
+    y += lat;
+  }
+  return [x / pts.length, y / pts.length];
+}
 
 const entries = [];
 ws.eachRow((row, i) => {
@@ -72,7 +83,8 @@ ws.eachRow((row, i) => {
   const lonV = row.getCell(cLon).value;
   if (!key || latV == null || latV === "" || lonV == null || lonV === "") return; // skip blank/placeholder rows
   const lat = Number(latV), lon = Number(lonV);
-  if (Number.isFinite(lat) && Number.isFinite(lon)) entries.push({ key, name: norm(row.getCell(cName).value), lat, lon });
+  if (Number.isFinite(lat) && Number.isFinite(lon))
+    entries.push({ key, name: norm(row.getCell(cName).value), code: norm(row.getCell(cCode).value), lat, lon });
 });
 console.log(`Looking up footprints for ${entries.length} buildings…`);
 
@@ -114,7 +126,12 @@ for (const e of entries) {
   }
   const ring = chosen.ring;
   if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) ring.push(ring[0]);
-  features.push({ type: "Feature", properties: { key: e.key, name: e.name }, geometry: { type: "Polygon", coordinates: [ring] } });
+  // label = building code (e.g. "J03"); blank for code-less off-campus sites.
+  features.push({
+    type: "Feature",
+    properties: { key: e.key, name: e.name, code: e.code, label: e.code, centroid: centroidOf(ring) },
+    geometry: { type: "Polygon", coordinates: [ring] },
+  });
 }
 
 mkdirSync(dirname(OUT), { recursive: true });

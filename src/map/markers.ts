@@ -118,6 +118,19 @@ export class Facilities {
     this.render();
   }
 
+  // Re-anchor buildings onto their real footprint centroid (when available) so
+  // pins and hubs sit dead-centre on the highlighted building rather than at the
+  // geocoded point (which can be near an edge or entrance).
+  setBuildingAnchors(anchors: Map<string, [number, number]>) {
+    for (const g of this.groups) {
+      const a = anchors.get(g.key);
+      if (a && Number.isFinite(a[0]) && Number.isFinite(a[1])) {
+        g.lon = a[0];
+        g.lat = a[1];
+      }
+    }
+  }
+
   // Unique buildings (key + position) that have at least one visible facility —
   // used to highlight their footprints on the map.
   visibleGroups(): { key: string; lon: number; lat: number }[] {
