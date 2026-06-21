@@ -1,0 +1,27 @@
+{
+  "name": "usyd-tss-crf-map",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Interactive MapLibre map of USyd TSS & CRF facilities, themeable, data-driven from an Excel workbook.",
+  "scripts": {
+    "predev": "npm run build:data",
+    "dev": "vite",
+    "build:data": "node scripts/build-data.mjs",
+    "build": "npm run build:data && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "maplibre-gl": "^5.6.0",
+    "pmtiles": "^4.3.0"
+  },
+  "devDependencies": {
+    "exceljs": "^4.4.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
+  }
+}

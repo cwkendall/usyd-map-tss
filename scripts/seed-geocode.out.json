@@ -1,0 +1,154 @@
+[
+  {
+    "key": "D17",
+    "name": "Charles Perkins Centre",
+    "query": "Charles Perkins Centre, University of Sydney, Camperdown NSW",
+    "lat": null,
+    "lon": null,
+    "display": ""
+  },
+  {
+    "key": "Centenary Institute",
+    "name": "Centenary Institute",
+    "query": "Centenary Institute, Missenden Road, Camperdown NSW",
+    "lat": null,
+    "lon": null,
+    "display": ""
+  },
+  {
+    "key": "Brain and Mind Centre",
+    "name": "Brain and Mind Centre",
+    "query": "Brain and Mind Centre, 94 Mallett Street, Camperdown NSW",
+    "lat": null,
+    "lon": null,
+    "display": ""
+  },
+  {
+    "key": "J03",
+    "name": "Engineering and Technology Precinct",
+    "query": "PNR Building, University of Sydney, Darlington NSW",
+    "lat": null,
+    "lon": null,
+    "display": ""
+  },
+  {
+    "key": "F09",
+    "name": "Madsen Building",
+    "query": "Madsen Building, University of Sydney, Camperdown NSW",
+    "lat": null,
+    "lon": null,
+    "display": ""
+  },
+  {
+    "key": "A31",
+    "name": "Sydney Nanoscience Hub",
+    "query": "Sydney Nanoscience Hub, University of Sydney, Camperdown NSW",
+    "lat": null,
+    "lon": null,
+    "display": ""
+  },
+  {
+    "key": "Kolling Institute",
+    "name": "Kolling Institute",
+    "query": "Kolling Institute, St Leonards NSW",
+    "lat": null,
+    "lon": null,
+    "display": ""
+  },
+  {
+    "key": "Royal North Shore Hospital",
+    "name": "Royal North Shore Hospital",
+    "query": "Royal North Shore Hospital, St Leonards NSW",
+    "lat": -33.8214322,
+    "lon": 151.1911201,
+    "display": "Royal North Shore Hospital, 1, Reserve Road, St Leonards, Lower North Shore, Sydney, New South Wales, 2065, Australia"
+  },
+  {
+    "key": "G08",
+    "name": "Molecular Bioscience Building",
+    "query": "Molecular Bioscience Building, University of Sydney, Camperdown NSW",
+    "lat": null,
+    "lon": null,
+    "display": ""
+  },
+  {
+    "key": "F11",
+    "name": "Chemistry Building / School of Chemistry",
+    "query": "School of Chemistry, University of Sydney, Camperdown NSW",
+    "lat": null,
+    "lon": null,
+    "display": ""
+  },
+  {
+    "key": "Sydney Institute of Agriculture",
+    "name": "Sydney Institute of Agriculture",
+    "query": "RMC Gunn Building, University of Sydney, Camperdown NSW",
+    "lat": null,
+    "lon": null,
+    "display": ""
+  },
+  {
+    "key": "Biomedical Building, Australian Technology Park",
+    "name": "Biomedical Building, Australian Technology Park",
+    "query": "Biomedical Building, Australian Technology Park, Eveleigh NSW",
+    "lat": -33.8962629,
+    "lon": 151.1959689,
+    "display": "Biomedical Building, 1, Central Avenue, South Eveleigh, Eveleigh, Sydney, New South Wales, 2015, Australia"
+  },
+  {
+    "key": "Moore College",
+    "name": "Moore College",
+    "query": "Moore Theological College, Newtown NSW",
+    "lat": -33.8917043,
+    "lon": 151.1870566,
+    "display": "Moore Theological College, King Street, Newtown, Inner West, Sydney, New South Wales, 2042, Australia"
+  },
+  {
+    "key": "Narrabri Campus",
+    "name": "Narrabri Campus",
+    "query": "I.A. Watson Grains Research Centre, Narrabri NSW",
+    "lat": null,
+    "lon": null,
+    "display": ""
+  },
+  {
+    "key": "A10",
+    "name": "",
+    "query": "Macleay Building, University of Sydney, Camperdown NSW",
+    "lat": null,
+    "lon": null,
+    "display": ""
+  },
+  {
+    "key": "J07",
+    "name": "School of Aerospace, Mechanical and Mechatronic Engineering",
+    "query": "School of Aerospace Mechanical and Mechatronic Engineering, University of Sydney",
+    "lat": null,
+    "lon": null,
+    "display": ""
+  },
+  {
+    "key": "J05",
+    "name": "Workshop site",
+    "query": "Link Building, University of Sydney, Darlington NSW",
+    "lat": null,
+    "lon": null,
+    "display": ""
+  },
+  {
+    "key": "D18",
+    "name": "Susan Wakhill Building",
+    "query": "Susan Wakil Health Building, University of Sydney, Camperdown NSW",
+    "lat": null,
+    "lon": null,
+    "display": ""
+  },
+  {
+    "key": "A28",
+    "name": "Physics Building",
+    "query": "Physics Building, University of Sydney, Camperdown NSW",
+    "lat": null,
+    "lon": null,
+    "display": ""
+  }
+]
