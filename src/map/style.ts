@@ -68,21 +68,40 @@ export function buildStyle(palette: Palette, detail: DetailLevel): StyleSpecific
     });
   }
 
-  // Buildings (medium+)
+  // Buildings (medium+) — all buildings get a cream fill, clearly distinct from
+  // the near-white base.
   if (showAt(detail, "medium")) {
     layers.push({
       id: "building",
       type: "fill",
       source: SOURCE,
       "source-layer": "building",
-      minzoom: 14,
+      minzoom: 13.5,
       paint: {
         "fill-color": p.building,
         "fill-outline-color": p.buildingOutline,
-        "fill-opacity": ["interpolate", ["linear"], ["zoom"], 14, 0, 15.5, 0.9],
+        "fill-opacity": ["interpolate", ["linear"], ["zoom"], 13.5, 0, 15, 0.95],
       },
     });
   }
+
+  // Ochre highlight under buildings that contain a facility. Rendered as a
+  // building-sized circle at each facility point (the basemap merges building
+  // footprints per tile, so we can't reliably recolour individual ones). The
+  // "facility-points" source is populated at runtime from the visible facilities.
+  layers.push({
+    id: "facility-highlight",
+    type: "circle",
+    source: "facility-points",
+    paint: {
+      "circle-color": p.primary,
+      "circle-opacity": 0.3,
+      "circle-radius": ["interpolate", ["exponential", 2], ["zoom"], 12, 3, 15, 13, 17, 34, 19, 90],
+      "circle-stroke-color": p.primary,
+      "circle-stroke-width": 1.5,
+      "circle-stroke-opacity": 0.85,
+    },
+  });
 
   // Roads — casing then fill. Major classes always; minor at medium; paths at high.
   const majorClasses = ["motorway", "trunk", "primary", "secondary"];
@@ -188,7 +207,12 @@ export function buildStyle(palette: Palette, detail: DetailLevel): StyleSpecific
     version: 8,
     name: `USyd ${detail}`,
     glyphs,
-    sources: { [SOURCE]: sourceDef() as any },
+    sources: {
+      [SOURCE]: sourceDef() as any,
+      // One point per facility-bearing building — populated at runtime; drawn as
+      // an ochre highlight circle under the pins.
+      "facility-points": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+    },
     layers,
   };
 }

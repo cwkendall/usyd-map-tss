@@ -388,6 +388,17 @@ body {
   align-items: center;
   gap: 7px;
 }
+.hl-chk {
+  margin-top: 10px;
+  cursor: pointer;
+}
+.hl-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--c-primary);
+  flex: 0 0 auto;
+}
 
 /* ---------- Markers ---------- */
 .marker {
@@ -405,11 +416,15 @@ body {
   border-radius: 20px;
   border: 1.5px solid rgba(255, 255, 255, 0.9);
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-  transition: transform 0.12s;
+  /* NOTE: never transition `transform` here — MapLibre positions the marker by
+     setting transform on this element, so a transform transition makes the pin
+     lag/float while panning. Animate only non-transform properties. */
+  transition: box-shadow 0.12s, filter 0.12s;
 }
 .marker-badge:hover {
-  transform: scale(1.12);
   z-index: 2;
+  box-shadow: 0 3px 9px rgba(0, 0, 0, 0.5);
+  filter: brightness(1.07);
 }
 .marker-hub {
   width: 30px;
@@ -439,8 +454,12 @@ body {
   text-shadow: none;
   font-size: 15px;
 }
+.marker-hub {
+  transition: box-shadow 0.12s, filter 0.12s;
+}
 .marker-hub:hover {
-  transform: scale(1.08);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+  filter: brightness(1.05);
 }
 
 /* ---------- Popups ---------- */

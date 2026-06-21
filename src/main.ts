@@ -1,10 +1,11 @@
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import type { Feature } from "geojson";
 import { Protocol } from "pmtiles";
 import { config } from "./config";
 import type { DetailLevel } from "./config";
 import { buildStyle } from "./map/style";
-import { Facilities, type Filter } from "./map/markers";
+import { Facilities, type Filter, type OverlapMode } from "./map/markers";
 import { exportPng } from "./map/export";
 import { buildControls, type LegendCluster } from "./ui/controls";
 import { loadTheme, saveTheme, clearSavedTheme, defaultTheme, applyThemeVars, type Theme } from "./theme";
@@ -17,6 +18,19 @@ if (config.basemapSource === "pmtiles") {
 }
 
 // --- state -------------------------------------------------------------------
+const OPTS_KEY = "usyd-map-opts-v1";
+const opts = { overlap: "spider" as OverlapMode, highlight: true, ...readOpts() };
+function readOpts(): Partial<{ overlap: OverlapMode; highlight: boolean }> {
+  try {
+    return JSON.parse(localStorage.getItem(OPTS_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+function saveOpts() {
+  localStorage.setItem(OPTS_KEY, JSON.stringify({ overlap: opts.overlap, highlight: opts.highlight }));
+}
+
 let theme: Theme = loadTheme();
 let detail: DetailLevel = "medium";
 const filter: Filter = { divisions: new Set(["TSS", "CRF"]), clusters: new Set() };
@@ -51,6 +65,31 @@ function rebuildStyle() {
 // --- data + UI ---------------------------------------------------------------
 const facilities = new Facilities(map);
 
+// Highlight buildings that contain a facility: feed one point per visible
+// facility-bearing building into the "facility-points" source, drawn as an ochre
+// circle under the pins. (The basemap merges building footprints per tile, so we
+// highlight by point rather than recolouring individual footprints.)
+function updateFacilityHighlight() {
+  const src = map.getSource("facility-points") as maplibregl.GeoJSONSource | undefined;
+  if (!src) return;
+  const features: Feature[] = opts.highlight
+    ? facilities.visibleGroups().map((g) => ({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [g.lon, g.lat] },
+        properties: {},
+      }))
+    : [];
+  src.setData({ type: "FeatureCollection", features });
+}
+// Repopulate after a style rebuild (theme/detail) clears the source.
+map.on("styledata", updateFacilityHighlight);
+
+// Debug handles (dev only) for inspection/automation.
+if (import.meta.env.DEV) {
+  (window as unknown as Record<string, unknown>).__map = map;
+  (window as unknown as Record<string, unknown>).__facilities = facilities;
+}
+
 async function start() {
   const [legendRaw] = await Promise.all([
     fetch(config.data.legend).then((r) => r.json()) as Promise<{ clusters: LegendCluster[] }>,
@@ -58,7 +97,11 @@ async function start() {
   ]);
   for (const c of facilities.clusters()) filter.clusters.add(c);
 
-  const renderWhenReady = () => facilities.render();
+  facilities.setMode(opts.overlap);
+  const renderWhenReady = () => {
+    facilities.render();
+    updateFacilityHighlight();
+  };
   if (map.isStyleLoaded()) renderWhenReady();
   else map.once("load", renderWhenReady);
 
@@ -69,8 +112,23 @@ async function start() {
     currentTheme: theme,
     filter,
     detail,
+    overlap: opts.overlap,
+    highlight: opts.highlight,
     on: {
-      filter: (f) => facilities.setFilter(f),
+      filter: (f) => {
+        facilities.setFilter(f);
+        updateFacilityHighlight();
+      },
+      overlap: (m) => {
+        opts.overlap = m;
+        saveOpts();
+        facilities.setMode(m);
+      },
+      highlight: (h) => {
+        opts.highlight = h;
+        saveOpts();
+        updateFacilityHighlight();
+      },
       detail: (d) => {
         detail = d;
         rebuildStyle();

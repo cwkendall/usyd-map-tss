@@ -7,8 +7,10 @@ An interactive, themeable [MapLibre](https://maplibre.org/) map of the Universit
 
 ## Features
 - Two division layers (TSS / CRF) and four colour-coded capability clusters, each toggleable.
-- Facility pins coloured by capability (CRF darker, TSS lighter); co-located pins **spiderfy**
-  on click.
+- Facility pins coloured by capability (CRF darker, TSS lighter). Co-located pins switch
+  between **spiderfy** (click to fan out) and **fan out** (always shown).
+- Buildings are drawn in cream; buildings that contain a facility get a toggleable **ochre
+  highlight**.
 - Hover and click **popups** with facility detail, building name/code, and website links.
 - Pan/zoom, geolocate, fullscreen, scale, shareable URL view state.
 - **Reskinnable**: monochrome + ochre + cream by default; switch presets or live-edit colours.

@@ -42,12 +42,12 @@ export const THEMES: Theme[] = [
     palette: {
       primary: "#E64626", // USyd masthead ochre-red (editable)
       secondary: "#F4EFE6", // cream
-      bg: "#F6F4F0",
-      land: "#EFEcE5",
+      bg: "#F7F5F1",
+      land: "#EFECE5",
       green: "#E2E6DD",
       water: "#CBD5DB",
-      building: "#E4E0D8",
-      buildingOutline: "#D6D1C7",
+      building: "#ECE1CC", // warm cream — distinct from the near-white base
+      buildingOutline: "#D8C9AC",
       roadMajor: "#FFFFFF",
       roadMinor: "#F1EEE8",
       roadCasing: "#DBD6CC",

@@ -41,6 +41,10 @@ export interface Filter {
   clusters: Set<string>; // cluster names
 }
 
+// How co-located pins behave: "spider" = collapse to a hub, click to fan out;
+// "offset" = always fanned out around the building (no hub).
+export type OverlapMode = "spider" | "offset";
+
 const esc = (s: string) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 
@@ -51,6 +55,7 @@ export class Facilities {
   private filter: Filter = { divisions: new Set(["TSS", "CRF"]), clusters: new Set() };
   private markers: maplibregl.Marker[] = [];
   private expanded = new Set<string>();
+  private mode: OverlapMode = "spider";
   private hoverPopup: maplibregl.Popup;
   private detailPopup: maplibregl.Popup;
 
@@ -96,6 +101,20 @@ export class Facilities {
     this.render();
   }
 
+  setMode(mode: OverlapMode) {
+    this.mode = mode;
+    this.expanded.clear();
+    this.render();
+  }
+
+  // Unique building positions that have at least one visible facility — used to
+  // highlight their footprints on the map.
+  visibleGroups(): { lon: number; lat: number }[] {
+    return this.groups
+      .filter((g) => g.facilities.some((f) => this.visible(f)))
+      .map((g) => ({ lon: g.lon, lat: g.lat }));
+  }
+
   private visible(f: Facility) {
     return this.filter.divisions.has(f.division) && this.filter.clusters.has(f.cluster);
   }
@@ -103,6 +122,15 @@ export class Facilities {
   private clear() {
     this.markers.forEach((m) => m.remove());
     this.markers = [];
+  }
+
+  // Fan children out on a circle via pixel offsets.
+  private fan(items: LayoutItem[], g: Group, vis: Facility[]) {
+    const r = 22 + Math.min(vis.length, 8) * 5;
+    vis.forEach((f, i) => {
+      const a = (i / vis.length) * Math.PI * 2 - Math.PI / 2;
+      items.push({ kind: "badge", g, f, offset: [Math.cos(a) * r, Math.sin(a) * r] });
+    });
   }
 
   // Single source of truth for what is drawn where — used by both render()
@@ -114,12 +142,10 @@ export class Facilities {
       if (vis.length === 0) continue;
       if (vis.length === 1) {
         items.push({ kind: "badge", g, f: vis[0], offset: [0, 0] });
+      } else if (this.mode === "offset") {
+        this.fan(items, g, vis); // always fanned out, no hub
       } else if (this.expanded.has(g.key)) {
-        const r = 24 + Math.min(vis.length, 8) * 5;
-        vis.forEach((f, i) => {
-          const a = (i / vis.length) * Math.PI * 2 - Math.PI / 2;
-          items.push({ kind: "badge", g, f, offset: [Math.cos(a) * r, Math.sin(a) * r] });
-        });
+        this.fan(items, g, vis);
         items.push({ kind: "hub", g, vis, expanded: true });
       } else {
         items.push({ kind: "hub", g, vis, expanded: false });

@@ -1,6 +1,6 @@
 // Builds the control panel: layer/cluster toggles, detail level, theme editor,
 // search, legend and the export dialog. Pure DOM; talks to the app via callbacks.
-import type { Facilities, Facility, Filter } from "../map/markers";
+import type { Facilities, Facility, Filter, OverlapMode } from "../map/markers";
 import type { DetailLevel } from "../config";
 import { THEMES, type Theme, type Palette } from "../theme";
 import type { ExportOptions } from "../map/export";
@@ -19,9 +19,13 @@ export interface ControlParams {
   currentTheme: Theme;
   filter: Filter;
   detail: DetailLevel;
+  overlap: OverlapMode;
+  highlight: boolean;
   on: {
     filter: (f: Filter) => void;
     detail: (d: DetailLevel) => void;
+    overlap: (m: OverlapMode) => void;
+    highlight: (h: boolean) => void;
     theme: (t: Theme) => void;
     resetTheme: () => void;
     export: (o: Omit<ExportOptions, "legendData" | "divisions">) => void;
@@ -150,6 +154,28 @@ export function buildControls(p: ControlParams) {
   });
   detSec.appendChild(seg);
   body.appendChild(detSec);
+
+  // --- Markers (overlap behaviour + building highlight) --------------------
+  const mkSec = el("div", "section");
+  mkSec.appendChild(el("div", "section-title", "Overlapping pins"));
+  const ovSeg = el("div", "segmented");
+  ([["spider", "Spiderfy"], ["offset", "Fan out"]] as [OverlapMode, string][]).forEach(([m, label]) => {
+    const b = el("button", p.overlap === m ? "on" : "", label) as HTMLButtonElement;
+    b.onclick = () => {
+      ovSeg.querySelectorAll("button").forEach((x) => x.classList.remove("on"));
+      b.classList.add("on");
+      p.on.overlap(m);
+    };
+    ovSeg.appendChild(b);
+  });
+  mkSec.appendChild(ovSeg);
+  mkSec.appendChild(el("div", "cap-hint", "Spiderfy: click a cluster to fan it out. Fan out: always shown."));
+  const hlChk = el("label", "chk hl-chk") as HTMLLabelElement;
+  hlChk.innerHTML = `<input type="checkbox" ${p.highlight ? "checked" : ""}> <span class="hl-dot"></span> Highlight facility buildings`;
+  (hlChk.querySelector("input") as HTMLInputElement).onchange = (e) =>
+    p.on.highlight((e.target as HTMLInputElement).checked);
+  mkSec.appendChild(hlChk);
+  body.appendChild(mkSec);
 
   // --- Theme ---------------------------------------------------------------
   const thSec = el("div", "section");
