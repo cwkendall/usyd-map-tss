@@ -20,7 +20,8 @@ if (config.basemapSource === "pmtiles") {
 
 // --- state -------------------------------------------------------------------
 const OPTS_KEY = "usyd-map-opts-v1";
-const opts = { overlap: "spider" as OverlapMode, highlight: true, ...readOpts() };
+// Fan-out is the default overlap mode (spider mode is being refined).
+const opts = { overlap: "offset" as OverlapMode, highlight: true, ...readOpts() };
 function readOpts(): Partial<{ overlap: OverlapMode; highlight: boolean }> {
   try {
     return JSON.parse(localStorage.getItem(OPTS_KEY) ?? "{}");
@@ -70,16 +71,32 @@ const facilities = new Facilities(map);
 let footprints: { type: "FeatureCollection"; features: Feature[] } = { type: "FeatureCollection", features: [] };
 let footprintKeys = new Set<string>();
 
+// Offset a lon/lat by metres east (dx) / north (dy) — for fixed label placement.
+function offsetMetres(lon: number, lat: number, dx: number, dy: number): [number, number] {
+  return [lon + dx / (111320 * Math.cos((lat * Math.PI) / 180)), lat + dy / 111320];
+}
+const point = (lon: number, lat: number, properties: Record<string, unknown>): Feature => ({
+  type: "Feature",
+  geometry: { type: "Point", coordinates: [lon, lat] },
+  properties,
+});
+
 // Highlight buildings that contain a facility. Buildings with a real footprint
 // get their actual outline (ochre); the few without one (regional/placeholder)
-// fall back to a circle. Both update with the active division/capability filter.
+// fall back to a circle. Building-code labels are placed at FIXED geographic
+// points (no zoom-dependent offset): centred on multi-facility buildings (whose
+// pins fan around the centre) and just below the pin on single-facility ones.
+// Everything updates with the active division/capability filter.
 function updateFacilityHighlight() {
   const fpSrc = map.getSource("facility-footprints") as maplibregl.GeoJSONSource | undefined;
   const ptSrc = map.getSource("facility-points") as maplibregl.GeoJSONSource | undefined;
-  if (!fpSrc || !ptSrc) return;
+  const lbSrc = map.getSource("facility-labels") as maplibregl.GeoJSONSource | undefined;
+  if (!fpSrc || !ptSrc || !lbSrc) return;
+  const empty = { type: "FeatureCollection" as const, features: [] };
   if (!opts.highlight) {
-    fpSrc.setData({ type: "FeatureCollection", features: [] });
-    ptSrc.setData({ type: "FeatureCollection", features: [] });
+    fpSrc.setData(empty);
+    ptSrc.setData(empty);
+    lbSrc.setData(empty);
     return;
   }
   const visible = facilities.visibleGroups();
@@ -90,9 +107,16 @@ function updateFacilityHighlight() {
   });
   ptSrc.setData({
     type: "FeatureCollection",
+    features: visible.filter((g) => !footprintKeys.has(g.key)).map((g) => point(g.lon, g.lat, {})),
+  });
+  lbSrc.setData({
+    type: "FeatureCollection",
     features: visible
-      .filter((g) => !footprintKeys.has(g.key))
-      .map((g) => ({ type: "Feature", geometry: { type: "Point", coordinates: [g.lon, g.lat] }, properties: {} })),
+      .filter((g) => g.code)
+      .map((g) => {
+        const [lon, lat] = g.count > 1 ? [g.lon, g.lat] : offsetMetres(g.lon, g.lat, 0, -14);
+        return point(lon, lat, { label: g.code });
+      }),
   });
 }
 
@@ -103,7 +127,8 @@ function ensureFacilityLayers() {
   const empty = { type: "FeatureCollection" as const, features: [] };
   if (!map.getSource("facility-footprints")) map.addSource("facility-footprints", { type: "geojson", data: empty });
   if (!map.getSource("facility-points")) map.addSource("facility-points", { type: "geojson", data: empty });
-  const before = map.getStyle().layers.find((l) => l.type === "symbol")?.id; // keep under labels
+  if (!map.getSource("facility-labels")) map.addSource("facility-labels", { type: "geojson", data: empty });
+  const before = map.getStyle().layers.find((l) => l.type === "symbol")?.id; // keep under basemap labels
   if (!map.getLayer("facility-footprint-fill"))
     map.addLayer({ id: "facility-footprint-fill", type: "fill", source: "facility-footprints", paint: { "fill-color": pal.primary, "fill-opacity": 0.45 } }, before);
   if (!map.getLayer("facility-footprint-line"))
@@ -125,27 +150,24 @@ function ensureFacilityLayers() {
       },
       before,
     );
-  // Building-code label centred on each highlighted footprint (dark ochre).
+  // Building-code label at a fixed point (dark ochre), above basemap labels.
   if (!map.getLayer("facility-label"))
     map.addLayer({
       id: "facility-label",
       type: "symbol",
-      source: "facility-footprints",
+      source: "facility-labels",
       minzoom: 14,
       layout: {
         "text-field": ["get", "label"],
         "text-font": ["Noto Sans Bold", "Noto Sans Regular"],
-        "text-size": ["interpolate", ["linear"], ["zoom"], 14, 9, 17, 13, 19, 16],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 14, 10, 17, 13, 19, 16],
         "text-allow-overlap": true,
         "text-ignore-placement": true,
-        // sit just below the pin (which is centred on the same footprint centroid)
-        "text-anchor": "top",
-        "text-offset": [0, 1.8],
       },
       paint: {
         "text-color": "#5A2A12",
         "text-halo-color": "rgba(255,255,255,0.9)",
-        "text-halo-width": 1.4,
+        "text-halo-width": 1.5,
       },
     });
 }

@@ -131,12 +131,16 @@ export class Facilities {
     }
   }
 
-  // Unique buildings (key + position) that have at least one visible facility —
-  // used to highlight their footprints on the map.
-  visibleGroups(): { key: string; lon: number; lat: number }[] {
+  // Unique buildings that have at least one visible facility — used to highlight
+  // their footprints and place building-code labels. lon/lat is the building
+  // anchor (footprint centroid when available); count = visible facilities here.
+  visibleGroups(): { key: string; lon: number; lat: number; count: number; code: string }[] {
     return this.groups
       .filter((g) => g.facilities.some((f) => this.visible(f)))
-      .map((g) => ({ key: g.key, lon: g.lon, lat: g.lat }));
+      .map((g) => {
+        const vis = g.facilities.filter((f) => this.visible(f));
+        return { key: g.key, lon: g.lon, lat: g.lat, count: vis.length, code: vis[0].buildingCode };
+      });
   }
 
   private visible(f: Facility) {

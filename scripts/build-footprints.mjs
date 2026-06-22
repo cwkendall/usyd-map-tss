@@ -64,15 +64,24 @@ const header = ws.getRow(1).values.map(norm);
 const col = (n) => header.indexOf(n);
 const cKey = col("Key"), cLat = col("Latitude"), cLon = col("Longitude"), cName = col("Building Name"), cCode = col("Building Code");
 
-// Average of the ring vertices (robust centroid for a building footprint).
+// Area-weighted polygon centroid (the true centre of mass of the footprint).
+// Falls back to the vertex average for degenerate/near-zero-area rings.
 function centroidOf(ring) {
-  const pts = ring.slice(0, -1); // drop closing duplicate
-  let x = 0, y = 0;
-  for (const [lon, lat] of pts) {
-    x += lon;
-    y += lat;
+  let A = 0, cx = 0, cy = 0;
+  for (let i = 0, n = ring.length - 1; i < n; i++) {
+    const [x0, y0] = ring[i];
+    const [x1, y1] = ring[i + 1];
+    const cross = x0 * y1 - x1 * y0;
+    A += cross;
+    cx += (x0 + x1) * cross;
+    cy += (y0 + y1) * cross;
   }
-  return [x / pts.length, y / pts.length];
+  A *= 0.5;
+  if (Math.abs(A) < 1e-12) {
+    const pts = ring.slice(0, -1);
+    return [pts.reduce((s, p) => s + p[0], 0) / pts.length, pts.reduce((s, p) => s + p[1], 0) / pts.length];
+  }
+  return [cx / (6 * A), cy / (6 * A)];
 }
 
 const entries = [];
