@@ -36,20 +36,31 @@ body {
   top: 14px;
   left: 14px;
   z-index: 5;
+  width: 312px;
   max-height: calc(100vh - 28px);
   display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 .panel {
-  width: 312px;
+  width: 100%;
   background: var(--c-panel);
   color: var(--c-panel-text);
   border-radius: var(--radius);
   box-shadow: 0 8px 30px var(--c-shadow);
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 28px);
+  min-height: 0;
   overflow: hidden;
   border: 1px solid var(--c-panel-border);
+}
+/* Accordion: the expanded panel fills remaining height (its body scrolls);
+   collapsed panels are just their header. */
+#ui > .panel:not(.collapsed) {
+  flex: 1 1 auto;
+}
+#ui > .panel.collapsed {
+  flex: 0 0 auto;
 }
 .panel-head {
   display: flex;
@@ -59,24 +70,9 @@ body {
   border-bottom: 1px solid var(--c-panel-border);
 }
 
-/* ---------- Right index panel ---------- */
-#index {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 5;
-  max-height: calc(100vh - 28px);
-  display: flex;
-}
-.panel-index {
-  width: 300px;
-}
-.panel-index.collapsed .panel-body {
+/* ---------- Facility index panel (stacked under the controls) ---------- */
+.panel.collapsed .panel-body {
   display: none;
-}
-/* Float the top-right map controls to the left of the index panel (300px + gaps). */
-.maplibregl-ctrl-top-right {
-  right: 322px;
 }
 .idx-cluster {
   padding: 10px 0;
@@ -163,9 +159,6 @@ body {
 .panel-body {
   overflow-y: auto;
   padding: 4px 14px 14px;
-}
-.panel.collapsed .panel-body {
-  display: none;
 }
 
 .section {
@@ -632,27 +625,12 @@ body {
 
 /* ---------- Responsive ---------- */
 @media (max-width: 640px) {
+  /* both panels stack in the left column as an accordion; controls stay top-right */
   #ui {
     left: 8px;
     right: 8px;
     top: 8px;
-  }
-  .panel {
-    width: 100%;
-  }
-  /* index becomes a bottom sheet so it doesn't overlap the top-left panel */
-  #index {
-    top: auto;
-    bottom: 8px;
-    left: 8px;
-    right: 8px;
-    max-height: 50vh;
-  }
-  .panel-index {
-    width: 100%;
-  }
-  /* index is a bottom sheet on mobile, so controls return to the right edge */
-  .maplibregl-ctrl-top-right {
-    right: 0;
+    width: auto;
+    max-width: 360px;
   }
 }

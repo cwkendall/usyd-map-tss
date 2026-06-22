@@ -78,7 +78,9 @@ export function buildStyle(palette: Palette, detail: DetailLevel): StyleSpecific
       "source-layer": "building",
       minzoom: 13.5,
       paint: {
-        "fill-color": p.building,
+        // Non-highlighted buildings use the theme's secondary (cream) colour, so
+        // the "Cream / secondary" swatch visibly recolours all buildings.
+        "fill-color": p.secondary,
         "fill-outline-color": p.buildingOutline,
         "fill-opacity": ["interpolate", ["linear"], ["zoom"], 13.5, 0, 15, 0.95],
       },

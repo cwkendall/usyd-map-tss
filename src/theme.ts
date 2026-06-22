@@ -41,12 +41,12 @@ export const THEMES: Theme[] = [
     name: "USyd Corporate",
     palette: {
       primary: "#E64626", // USyd masthead ochre-red (editable)
-      secondary: "#F4EFE6", // cream
+      secondary: "#ECE1CC", // cream — also the non-highlighted building fill
       bg: "#F7F5F1",
       land: "#EFECE5",
       green: "#E2E6DD",
       water: "#CBD5DB",
-      building: "#ECE1CC", // warm cream — distinct from the near-white base
+      building: "#ECE1CC", // (kept for reference; fill now uses `secondary`)
       buildingOutline: "#D8C9AC",
       roadMajor: "#FFFFFF",
       roadMinor: "#F1EEE8",

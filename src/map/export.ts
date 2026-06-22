@@ -67,7 +67,7 @@ export async function exportPng(map: maplibregl.Map, facilities: Facilities, opt
       drawBadge(ctx, p.x * s, p.y * s, it.f.label, it.f.fillHex, it.f.fontHex, s);
     } else {
       const p = clone.project([it.g.lon, it.g.lat]);
-      drawHub(ctx, p.x * s, p.y * s, it.expanded ? "×" : String(it.vis.length), it.vis.map((f) => f.fillHex), s);
+      drawHub(ctx, p.x * s, p.y * s, String(it.vis.length), it.vis.map((f) => f.fillHex), s);
     }
   }
 

@@ -19,9 +19,9 @@ if (config.basemapSource === "pmtiles") {
 }
 
 // --- state -------------------------------------------------------------------
-const OPTS_KEY = "usyd-map-opts-v1";
-// Fan-out is the default overlap mode (spider mode is being refined).
-const opts = { overlap: "offset" as OverlapMode, highlight: true, ...readOpts() };
+const OPTS_KEY = "usyd-map-opts-v2";
+// Spider is the default: one planted marker/hub per building (collapses on zoom).
+const opts = { overlap: "spider" as OverlapMode, highlight: true, ...readOpts() };
 function readOpts(): Partial<{ overlap: OverlapMode; highlight: boolean }> {
   try {
     return JSON.parse(localStorage.getItem(OPTS_KEY) ?? "{}");
@@ -71,10 +71,6 @@ const facilities = new Facilities(map);
 let footprints: { type: "FeatureCollection"; features: Feature[] } = { type: "FeatureCollection", features: [] };
 let footprintKeys = new Set<string>();
 
-// Offset a lon/lat by metres east (dx) / north (dy) — for fixed label placement.
-function offsetMetres(lon: number, lat: number, dx: number, dy: number): [number, number] {
-  return [lon + dx / (111320 * Math.cos((lat * Math.PI) / 180)), lat + dy / 111320];
-}
 const point = (lon: number, lat: number, properties: Record<string, unknown>): Feature => ({
   type: "Feature",
   geometry: { type: "Point", coordinates: [lon, lat] },
@@ -109,14 +105,11 @@ function updateFacilityHighlight() {
     type: "FeatureCollection",
     features: visible.filter((g) => !footprintKeys.has(g.key)).map((g) => point(g.lon, g.lat, {})),
   });
+  // Code label at the building's representative point (a fixed geographic point);
+  // a constant-pixel text-offset in the layer keeps it just below the pin.
   lbSrc.setData({
     type: "FeatureCollection",
-    features: visible
-      .filter((g) => g.code)
-      .map((g) => {
-        const [lon, lat] = g.count > 1 ? [g.lon, g.lat] : offsetMetres(g.lon, g.lat, 0, -14);
-        return point(lon, lat, { label: g.code });
-      }),
+    features: visible.filter((g) => g.code).map((g) => point(g.lon, g.lat, { label: g.code })),
   });
 }
 
@@ -160,7 +153,9 @@ function ensureFacilityLayers() {
       layout: {
         "text-field": ["get", "label"],
         "text-font": ["Noto Sans Bold", "Noto Sans Regular"],
-        "text-size": ["interpolate", ["linear"], ["zoom"], 14, 10, 17, 13, 19, 16],
+        "text-size": 12, // constant so the offset below stays a fixed pixel distance
+        "text-anchor": "top",
+        "text-offset": [0, 1.5], // ~18px below the building anchor (clears the pin)
         "text-allow-overlap": true,
         "text-ignore-placement": true,
       },
@@ -269,10 +264,35 @@ async function start() {
   });
 
   buildIndexPanel({
-    mount: document.getElementById("index")!,
+    mount: document.getElementById("ui")!,
     facilities,
     legend: legendRaw.clusters,
     onSelect: (f) => facilities.focus(f),
+  });
+
+  setupAccordion(document.getElementById("ui")!);
+}
+
+// Stack the panels in the left column as an accordion: expanding one collapses the
+// others, so the column always fits (and works on mobile). The controls' own
+// collapse buttons are re-wired here to drive the accordion.
+function setupAccordion(container: HTMLElement) {
+  const panels = [...container.querySelectorAll<HTMLElement>(".panel")];
+  const setArrow = (p: HTMLElement) => {
+    const btn = p.querySelector<HTMLButtonElement>(".icon-btn");
+    if (btn) btn.textContent = p.classList.contains("collapsed") ? "▸" : "▾";
+  };
+  panels.forEach((panel, i) => {
+    panel.classList.toggle("collapsed", i !== 0); // first open, rest collapsed
+    const toggle = (e: Event) => {
+      e.stopPropagation();
+      const willOpen = panel.classList.contains("collapsed");
+      if (willOpen) panels.forEach((p) => p.classList.add("collapsed"));
+      panel.classList.toggle("collapsed", !willOpen);
+      panels.forEach(setArrow);
+    };
+    panel.querySelector<HTMLButtonElement>(".icon-btn")!.onclick = toggle;
+    setArrow(panel);
   });
 }
 

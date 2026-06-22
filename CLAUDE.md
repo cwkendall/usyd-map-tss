@@ -91,17 +91,32 @@ src/
   from the workbook `Fill Hex`; unclustered facilities (Mass Spec TSS) render neutral grey.
 - **Theme** drives basemap + UI chrome only (monochrome charcoal/grey/white + ochre primary +
   cream secondary). Buildings render cream; **facility buildings are highlighted ochre**.
-- **Marker placement** (`markers.ts` `layout()` is the single source of truth, shared with
-  export): co-located pins are placed at **fixed geographic positions** (small metre offsets
-  around the building centroid), NOT pixel offsets — pixel offsets slide across the map on
-  zoom. Buildings are anchored to their **footprint centroid** (area-weighted, via
-  `setBuildingAnchors`) so pins/labels sit dead-centre on the building.
-  - **Fan-out** (current default): all co-located pins fanned around the centre, always shown.
-  - **Spiderfy**: collapse to a count "hub" at the centroid; click to fan out. (Default switched
-    to fan-out while spider UX is refined.)
-- **Building-code labels**: a `facility-labels` symbol layer at FIXED points (no zoom-dependent
-  text-offset) — centred on multi-facility buildings (pins fan around), ~14 m below the pin on
-  single-facility ones. Dark ochre `#5A2A12`.
+- **Building anchor**: each building is anchored to a **representative point of its footprint**
+  (`build-footprints.mjs` `representativePoint` — area centroid if inside, else scanline
+  midpoint; the area centroid falls OUTSIDE concave/L-shaped buildings, so don't use it raw).
+  Stored in `facility-footprints.geojson` `properties.centroid`; applied via
+  `setBuildingAnchors`. Pins, hubs and labels all sit ON the building.
+- **Marker placement** (`markers.ts` `layout()` = single source of truth, shared with export):
+  EVERY marker has a FIXED geographic coordinate (`fanPos`). A lone facility sits at the
+  building centre; co-located facilities have fixed "fan" coordinates = a ring of metre offsets
+  around the centre. Nothing is repositioned on zoom/pan (no pixel offsets, no recompute).
+  - **Spiderfy** (default): one count "hub" at the centre; clicking it reveals the facilities
+    at their fixed fan coordinates, animated outward from the centre. The fan-out animation is a
+    one-shot CSS transform transition on the badge's INNER element (the marker root is what
+    MapLibre positions, so the animation never causes pan/zoom lag). `justExpanded` flags which
+    group to animate on the next `render()`. Collapse by clicking empty map.
+  - **Fan-out** mode: all co-located pins shown at their fixed fan coordinates, no hub.
+  - The earlier bug ("markers float off the building / move on zoom") was the anchor: the raw
+    area centroid falls OUTSIDE concave buildings. `representativePoint` (guaranteed inside) is
+    the fix — do NOT revert to a plain centroid.
+- **Building-code labels**: a `facility-labels` symbol layer at the building anchor (a FIXED
+  geographic point) with CONSTANT text-size + `text-offset [0,1.5]` so the code sits ~18 px
+  below the hub at every zoom. Dark ochre `#5A2A12`.
+- **Buildings** are filled with the theme's **`secondary`** colour, so the panel's "Cream /
+  secondary" swatch recolours every non-highlighted building. (`map/style.ts`.)
+- **Panels** (`#ui`): the controls panel and the Facility Index stack in one left column as an
+  **accordion** (`setupAccordion` in `main.ts` — expanding one collapses the other). Map nav
+  controls sit top-right. Works on mobile (single narrow column).
 - **Highlight layers are added imperatively** in `main.ts` (`ensureFacilityLayers`) after each
   style load, NOT inside `buildStyle` — this avoids MapLibre `setStyle`-diff "source not found"
   errors on theme/detail changes. Sources: `facility-footprints` (polygons), `facility-points`
@@ -115,8 +130,9 @@ src/
   wrong before (J05 duplicated J03's coordinate) — corrected, flagged verify.
 - **Sydney Institute of Agriculture** (distributed, no code) → relocated to **R. D. Watt
   Building** so it no longer overlaps A31's footprint. Best-effort placeholder.
-- **Madsen (F09)** matched a small OSM footprint (tiny highlight). **Narrabri** has no nearby
-  OSM building → circle-highlight fallback. **Geoscience (TSS)** has no location → omitted.
+- **Madsen (F09)** and **Moore College** matched small OSM footprints where the representative
+  point lands marginally outside the tiny polygon (cosmetically negligible). **Narrabri** has no
+  nearby OSM building → circle-highlight fallback. **Geoscience (TSS)** has no location → omitted.
 - Duplicate-building check: no two *coded* buildings now share a location. Re-check after edits
   (pairs within ~30 m with different codes indicate an error — each code is a unique building).
 

@@ -1,6 +1,11 @@
-// Facility markers with capability colours, click-to-spiderfy for co-located
-// pins, and hover/click popups. Markers are HTML (maplibregl.Marker) so they
-// survive map.setStyle() during theme/detail changes.
+// Facility markers. Every marker has a FIXED geographic coordinate:
+//  - a lone facility sits at its building's centre (footprint representative point);
+//  - co-located facilities have fixed "fan" coordinates (a ring of metre offsets
+//    around that centre) — the same positions used in fan-out mode.
+// In spider mode a building shows one count "hub" at the centre; clicking it
+// reveals the facilities AT THEIR FIXED fan coordinates, animated outward from the
+// centre (the only dynamic bit is that one CSS slide). Nothing is repositioned on
+// zoom/pan — markers are plain fixed-coordinate map pins.
 import maplibregl from "maplibre-gl";
 import { config } from "../config";
 
@@ -28,33 +33,27 @@ export interface Facility {
 
 export interface Group {
   key: string;
-  lon: number;
+  lon: number; // building centre (footprint representative point after setBuildingAnchors)
   lat: number;
   facilities: Facility[];
 }
 
 export type LayoutItem =
-  // Badge carries its own geographic position (lon/lat) so it stays anchored to
-  // the map on zoom. Co-located pins are spread by a small metre offset, not a
-  // pixel offset (pixel offsets slide across the map as you zoom).
-  | { kind: "badge"; f: Facility; lon: number; lat: number }
-  | { kind: "hub"; g: Group; vis: Facility[]; expanded: boolean };
-
-// Offset a lon/lat by a number of metres east (dx) and north (dy).
-function offsetMetres(lon: number, lat: number, dx: number, dy: number): [number, number] {
-  const dLat = dy / 111320;
-  const dLon = dx / (111320 * Math.cos((lat * Math.PI) / 180));
-  return [lon + dLon, lat + dLat];
-}
+  | { kind: "badge"; g: Group; f: Facility; lon: number; lat: number }
+  | { kind: "hub"; g: Group; vis: Facility[] };
 
 export interface Filter {
-  divisions: Set<string>; // "TSS","CRF"
-  clusters: Set<string>; // cluster names
+  divisions: Set<string>;
+  clusters: Set<string>;
 }
 
-// How co-located pins behave: "spider" = collapse to a hub, click to fan out;
-// "offset" = always fanned out around the building (no hub).
+// "spider": one hub per building, click to fan out. "offset": always fanned out.
 export type OverlapMode = "spider" | "offset";
+
+// Offset a lon/lat by metres east (dx) / north (dy).
+function offsetMetres(lon: number, lat: number, dx: number, dy: number): [number, number] {
+  return [lon + dx / (111320 * Math.cos((lat * Math.PI) / 180)), lat + dy / 111320];
+}
 
 const esc = (s: string) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
@@ -65,8 +64,9 @@ export class Facilities {
   all: Facility[] = [];
   private filter: Filter = { divisions: new Set(["TSS", "CRF"]), clusters: new Set() };
   private markers: maplibregl.Marker[] = [];
-  private expanded = new Set<string>();
   private mode: OverlapMode = "spider";
+  private expanded = new Set<string>();
+  private justExpanded = new Set<string>(); // groups to animate on the next render
   private hoverPopup: maplibregl.Popup;
   private detailPopup: maplibregl.Popup;
 
@@ -75,7 +75,6 @@ export class Facilities {
     this.hoverPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 16, className: "pop-hover" });
     this.detailPopup = new maplibregl.Popup({ closeButton: true, closeOnClick: true, offset: 16, maxWidth: "300px", className: "pop-detail" });
     map.on("click", (e) => {
-      // Click on empty map collapses any expanded hubs.
       if ((e.originalEvent.target as HTMLElement)?.closest(".marker")) return;
       if (this.expanded.size) {
         this.expanded.clear();
@@ -98,7 +97,6 @@ export class Facilities {
       byKey.set(f.buildingKey, g);
     }
     this.groups = [...byKey.values()];
-    // default: all clusters on
     this.filter.clusters = new Set(this.all.map((f) => f.cluster));
   }
 
@@ -118,9 +116,8 @@ export class Facilities {
     this.render();
   }
 
-  // Re-anchor buildings onto their real footprint centroid (when available) so
-  // pins and hubs sit dead-centre on the highlighted building rather than at the
-  // geocoded point (which can be near an edge or entrance).
+  // Re-anchor buildings onto a representative point of their footprint (guaranteed
+  // inside the polygon) so the centre, hub and label sit ON the building.
   setBuildingAnchors(anchors: Map<string, [number, number]>) {
     for (const g of this.groups) {
       const a = anchors.get(g.key);
@@ -131,9 +128,6 @@ export class Facilities {
     }
   }
 
-  // Unique buildings that have at least one visible facility — used to highlight
-  // their footprints and place building-code labels. lon/lat is the building
-  // anchor (footprint centroid when available); count = visible facilities here.
   visibleGroups(): { key: string; lon: number; lat: number; count: number; code: string }[] {
     return this.groups
       .filter((g) => g.facilities.some((f) => this.visible(f)))
@@ -152,33 +146,28 @@ export class Facilities {
     this.markers = [];
   }
 
-  // Fan children out on a circle around the building, using metre offsets so they
-  // stay locked to the map (and separate further as you zoom in).
-  private fan(items: LayoutItem[], g: Group, vis: Facility[]) {
-    const r = 14 + Math.min(vis.length, 8) * 2.5; // metres
-    vis.forEach((f, i) => {
-      const a = (i / vis.length) * Math.PI * 2 - Math.PI / 2;
-      const [lon, lat] = offsetMetres(g.lon, g.lat, Math.cos(a) * r, -Math.sin(a) * r);
-      items.push({ kind: "badge", f, lon, lat });
-    });
+  // Fixed fan coordinate for facility i of n, on a ring around the building centre.
+  private fanPos(g: Group, n: number, i: number): [number, number] {
+    if (n === 1) return [g.lon, g.lat];
+    const r = 12 + Math.min(n, 8) * 2.5; // metres
+    const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+    return offsetMetres(g.lon, g.lat, Math.cos(a) * r, -Math.sin(a) * r);
   }
 
-  // Single source of truth for what is drawn where — used by both render()
-  // (HTML markers) and the image export (canvas redraw).
+  // Single source of truth for what is drawn where (shared with the image export).
   layout(): LayoutItem[] {
     const items: LayoutItem[] = [];
     for (const g of this.groups) {
       const vis = g.facilities.filter((f) => this.visible(f));
       if (vis.length === 0) continue;
-      if (vis.length === 1) {
-        items.push({ kind: "badge", f: vis[0], lon: g.lon, lat: g.lat });
-      } else if (this.mode === "offset") {
-        this.fan(items, g, vis); // always fanned out, no hub
-      } else if (this.expanded.has(g.key)) {
-        this.fan(items, g, vis);
-        items.push({ kind: "hub", g, vis, expanded: true });
+      const fanned = vis.length === 1 || this.mode === "offset" || this.expanded.has(g.key);
+      if (fanned) {
+        vis.forEach((f, i) => {
+          const [lon, lat] = this.fanPos(g, vis.length, i);
+          items.push({ kind: "badge", g, f, lon, lat });
+        });
       } else {
-        items.push({ kind: "hub", g, vis, expanded: false });
+        items.push({ kind: "hub", g, vis });
       }
     }
     return items;
@@ -187,18 +176,22 @@ export class Facilities {
   render() {
     this.clear();
     for (const it of this.layout()) {
-      if (it.kind === "badge") this.addBadge(it.f, it.lon, it.lat);
-      else this.addHub(it.g, it.vis, it.expanded);
+      if (it.kind === "badge") this.addBadge(it.g, it.f, it.lon, it.lat, this.justExpanded.has(it.g.key));
+      else this.addHub(it.g, it.vis);
     }
+    this.justExpanded.clear();
   }
 
-  private addBadge(f: Facility, lon: number, lat: number) {
+  private addBadge(g: Group, f: Facility, lon: number, lat: number, animate: boolean) {
+    const root = document.createElement("div");
+    root.className = "marker";
     const el = document.createElement("div");
-    el.className = "marker marker-badge";
+    el.className = "marker-badge";
     el.textContent = f.label;
     el.style.background = f.fillHex;
     el.style.color = f.fontHex;
     el.title = `${f.label} — ${f.facility}`;
+    root.appendChild(el);
     el.addEventListener("mouseenter", () => this.showHover(f, lon, lat));
     el.addEventListener("mouseleave", () => this.hoverPopup.remove());
     el.addEventListener("click", (ev) => {
@@ -206,29 +199,43 @@ export class Facilities {
       this.hoverPopup.remove();
       this.showDetail(f, lon, lat);
     });
-    const m = new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(this.map);
-    this.markers.push(m);
+    // Fan-out animation: slide the badge from the building centre to its fixed
+    // coordinate. Animates the INNER element only, so map pan/zoom never lags.
+    if (animate) {
+      const from = this.map.project([g.lon, g.lat]);
+      const to = this.map.project([lon, lat]);
+      el.style.transform = `translate(${from.x - to.x}px, ${from.y - to.y}px)`;
+      requestAnimationFrame(() => {
+        el.style.transition = "transform 0.25s ease-out";
+        el.style.transform = "translate(0, 0)";
+      });
+    }
+    this.markers.push(new maplibregl.Marker({ element: root }).setLngLat([lon, lat]).addTo(this.map));
   }
 
-  private addHub(g: Group, vis: Facility[], isExpanded: boolean) {
+  private addHub(g: Group, vis: Facility[]) {
+    const root = document.createElement("div");
+    root.className = "marker";
     const el = document.createElement("div");
-    el.className = "marker marker-hub" + (isExpanded ? " is-open" : "");
-    // segmented ring of the cluster colours present
+    el.className = "marker-hub";
     const colours = [...new Set(vis.map((f) => f.fillHex))];
-    el.style.background = colours.length === 1 ? colours[0] : `conic-gradient(${colours.map((c, i) => `${c} ${(i / colours.length) * 100}% ${((i + 1) / colours.length) * 100}%`).join(",")})`;
-    el.innerHTML = `<span>${isExpanded ? "×" : vis.length}</span>`;
-    el.title = isExpanded ? "Collapse" : `${vis.length} facilities here — click to expand`;
+    el.style.background =
+      colours.length === 1
+        ? colours[0]
+        : `conic-gradient(${colours.map((c, i) => `${c} ${(i / colours.length) * 100}% ${((i + 1) / colours.length) * 100}%`).join(",")})`;
+    el.innerHTML = `<span>${vis.length}</span>`;
+    el.title = `${vis.length} facilities here — click to reveal`;
+    root.appendChild(el);
     el.addEventListener("click", (ev) => {
       ev.stopPropagation();
-      if (isExpanded) this.expanded.delete(g.key);
-      else this.expanded.add(g.key);
+      this.expanded.add(g.key);
+      this.justExpanded.add(g.key);
       this.render();
     });
-    const m = new maplibregl.Marker({ element: el, offset: [0, 0] }).setLngLat([g.lon, g.lat]).addTo(this.map);
-    this.markers.push(m);
+    this.markers.push(new maplibregl.Marker({ element: root }).setLngLat([g.lon, g.lat]).addTo(this.map));
   }
 
-  private showHover(f: Facility, lon = f.lon, lat = f.lat) {
+  private showHover(f: Facility, lon: number, lat: number) {
     this.hoverPopup
       .setLngLat([lon, lat])
       .setHTML(`<div class="ph"><b>${esc(f.label)}</b> · ${esc(f.facility)}</div>`)
@@ -247,7 +254,7 @@ export class Facilities {
       .setLngLat([lon, lat])
       .setHTML(
         `<div class="pd">
-          <div class="pd-head"><span class="pd-dot" style="background:${esc(f.fillHex)}"></span>
+          <div class="pd-head">
             <span class="pd-label" style="background:${esc(f.fillHex)};color:${esc(f.fontHex)}">${esc(f.label)}</span>
             <span class="pd-div">${esc(f.division)}</span></div>
           <h3>${esc(f.facility)}</h3>
@@ -260,12 +267,23 @@ export class Facilities {
       .addTo(this.map);
   }
 
-  // Used by search: fly to a facility, expand its group, open its detail popup.
+  // Used by search/index: fly to the building, expand it, open the facility popup.
   focus(f: Facility) {
     const g = this.groups.find((x) => x.key === f.buildingKey);
-    if (g && g.facilities.filter((x) => this.visible(x)).length > 1) this.expanded.add(g.key);
-    this.render();
-    this.map.flyTo({ center: [f.lon, f.lat], zoom: Math.max(this.map.getZoom(), 16.5), duration: 800 });
-    this.map.once("moveend", () => this.showDetail(f));
+    if (!g) return;
+    this.map.flyTo({ center: [g.lon, g.lat], zoom: Math.max(this.map.getZoom(), 17), duration: 800 });
+    this.map.once("moveend", () => {
+      if (g.facilities.filter((x) => this.visible(x)).length > 1) {
+        this.expanded.add(g.key);
+        this.justExpanded.add(g.key);
+        this.render();
+      }
+      const [lon, lat] = this.fanPos(
+        g,
+        g.facilities.filter((x) => this.visible(x)).length,
+        g.facilities.filter((x) => this.visible(x)).indexOf(f),
+      );
+      this.showDetail(f, lon, lat);
+    });
   }
 }

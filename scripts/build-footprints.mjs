@@ -84,6 +84,29 @@ function centroidOf(ring) {
   return [cx / (6 * A), cy / (6 * A)];
 }
 
+// A point GUARANTEED to be inside the footprint: the area centroid if it lies
+// inside; otherwise the midpoint of the longest interior span of a horizontal
+// scanline through the centroid's latitude. Avoids placing pins/labels outside
+// concave (e.g. L-shaped) buildings.
+function representativePoint(ring) {
+  const c = centroidOf(ring);
+  if (pointInRing(c[0], c[1], ring)) return c;
+  const y = c[1];
+  const xs = [];
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if (yi > y !== yj > y) xs.push(xi + ((xj - xi) * (y - yi)) / (yj - yi));
+  }
+  xs.sort((a, b) => a - b);
+  let best = [xs[0] ?? c[0], xs[1] ?? c[0]], bestLen = -1;
+  for (let i = 0; i + 1 < xs.length; i += 2) {
+    const len = xs[i + 1] - xs[i];
+    if (len > bestLen) (bestLen = len), (best = [xs[i], xs[i + 1]]);
+  }
+  return [(best[0] + best[1]) / 2, y];
+}
+
 const entries = [];
 ws.eachRow((row, i) => {
   if (i === 1) return;
@@ -138,7 +161,7 @@ for (const e of entries) {
   // label = building code (e.g. "J03"); blank for code-less off-campus sites.
   features.push({
     type: "Feature",
-    properties: { key: e.key, name: e.name, code: e.code, label: e.code, centroid: centroidOf(ring) },
+    properties: { key: e.key, name: e.name, code: e.code, label: e.code, centroid: representativePoint(ring) },
     geometry: { type: "Polygon", coordinates: [ring] },
   });
 }
