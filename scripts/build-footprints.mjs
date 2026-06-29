@@ -66,11 +66,17 @@ const cKey = col("Key"), cLat = col("Latitude"), cLon = col("Longitude"), cName 
 
 // Area-weighted polygon centroid (the true centre of mass of the footprint).
 // Falls back to the vertex average for degenerate/near-zero-area rings.
+// Coordinates are translated to be relative to the first vertex before the shoelace
+// sums: lon/lat are ~151/-33, but a small building's area in deg² can be ~1e-9, so
+// computing directly on absolute coordinates causes catastrophic cancellation in
+// cx/cy (dividing large sums by a tiny A) and silently produces a centroid hundreds
+// of metres away. Working in local offsets keeps every term small and accurate.
 function centroidOf(ring) {
+  const [ox, oy] = ring[0];
   let A = 0, cx = 0, cy = 0;
   for (let i = 0, n = ring.length - 1; i < n; i++) {
-    const [x0, y0] = ring[i];
-    const [x1, y1] = ring[i + 1];
+    const x0 = ring[i][0] - ox, y0 = ring[i][1] - oy;
+    const x1 = ring[i + 1][0] - ox, y1 = ring[i + 1][1] - oy;
     const cross = x0 * y1 - x1 * y0;
     A += cross;
     cx += (x0 + x1) * cross;
@@ -81,7 +87,7 @@ function centroidOf(ring) {
     const pts = ring.slice(0, -1);
     return [pts.reduce((s, p) => s + p[0], 0) / pts.length, pts.reduce((s, p) => s + p[1], 0) / pts.length];
   }
-  return [cx / (6 * A), cy / (6 * A)];
+  return [cx / (6 * A) + ox, cy / (6 * A) + oy];
 }
 
 // A point GUARANTEED to be inside the footprint: the area centroid if it lies
@@ -120,9 +126,16 @@ ws.eachRow((row, i) => {
 });
 console.log(`Looking up footprints for ${entries.length} buildings…`);
 
-// One Overpass query: union of building ways near every point.
+// One Overpass query: union of building ways AND multipolygon relations near every
+// point. Some buildings (e.g. Madsen, with a courtyard) are mapped as a
+// relation["building"] with outer/inner member ways rather than a single way — if we
+// only queried ways, the matcher would skip the real footprint and fall back to
+// whatever small unrelated way happened to contain the point instead.
 const query = `[out:json][timeout:90];(${entries
-  .map((e) => `way["building"](around:${SEARCH_RADIUS},${e.lat},${e.lon});`)
+  .map(
+    (e) =>
+      `way["building"](around:${SEARCH_RADIUS},${e.lat},${e.lon});relation["building"](around:${SEARCH_RADIUS},${e.lat},${e.lon});`
+  )
   .join("")});out geom;`;
 
 const res = await fetch(OVERPASS, {
@@ -135,6 +148,16 @@ const data = await res.json();
 const ways = (data.elements ?? [])
   .filter((el) => el.type === "way" && Array.isArray(el.geometry) && el.geometry.length >= 4)
   .map((el) => ({ ring: el.geometry.map((g) => [g.lon, g.lat]), name: el.tags?.name ?? "" }));
+// Multipolygon relations: use the outer member ring(s) (ignore inner/courtyard holes —
+// fine for a highlight outline). Skip relations with no usable outer geometry.
+for (const el of data.elements ?? []) {
+  if (el.type !== "relation" || !Array.isArray(el.members)) continue;
+  for (const m of el.members) {
+    if (m.role === "outer" && Array.isArray(m.geometry) && m.geometry.length >= 4) {
+      ways.push({ ring: m.geometry.map((g) => [g.lon, g.lat]), name: el.tags?.name ?? "" });
+    }
+  }
+}
 console.log(`Overpass returned ${ways.length} candidate building footprints.`);
 
 const features = [];
